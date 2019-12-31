@@ -16,5 +16,5 @@ swoole文件分段上传,集成视频转码 加水印,同步至七牛云
 5.访问测试页面
   http://服务器ip:9501/test
   
-  
 
+6.要使用转码功能,请安装 [FFmpeg集成包](https://github.com/tenry18/ffmpeg)
