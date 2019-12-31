@@ -67,15 +67,15 @@ return [
         'qiniu' => [
             'driver'  => 'qiniu',
             'domains' => [
-                'default'   => 'tenry.s3-cn-south-1.qiniucs.com', //你的七牛域名
+                'default'   => '', //你的七牛域名
                 'https'     => '',     //你的HTTPS域名
                 'custom'    => '',     //你的自定义域名
             ],
-            'access_key'=> '_SpUyWnjyJb3bIwuYJuE-_9l6Q0izRzvfT_0v0qp',  //AccessKey
-            'secret_key'=> '9OxH9QRGIV7rCprEAj6V3s9f82pgjrWfwbEzhn_Z',  //SecretKey
+            'access_key'=> '',  //AccessKey
+            'secret_key'=> '',  //SecretKey
             'bucket'    => 'tenry',  //Bucket名字
             'notify_url'=> '',  //持久化处理回调地址
-            'download'=>'http://py4b3mb7z.bkt.clouddn.com/'  //下载地址
+            'download'=>''  //下载地址
         ],
     ],
 
