@@ -1,0 +1,94 @@
+<?php
+
+
+namespace App\Tasks;
+
+use App\Util\FF;
+use FFMpeg\Format\Video\X264;
+use Hhxsv5\LaravelS\Swoole\Task\Task;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+
+class ZipToM3u8 extends Task
+{
+    private $uuid;
+
+    /**
+     * ZipToM3u8 constructor.
+     * @param string $uuid
+     */
+    public function __construct(string $uuid)
+    {
+        $this->uuid=$uuid;
+    }
+
+    /**
+     * Execute the job.
+     * @return void
+     */
+    public function handle()
+    {
+        Log::channel('transcoding')->info("压缩包转码==开始==:".$this->uuid);
+        $data=\App\Models\Upload::find($this->uuid);
+        if(empty($data)){Log::channel('transcoding')->error("压缩包转码==找不到数据==:".$this->uuid);return;}
+        try{
+            $localDisk=Storage::disk('local');
+            $localDisk->copy(dirname($data['source_path']).'/cover.jpg',dirname(dirname($data['source_path'])).'/cover.jpg');
+            $ffmpeg=FF::getInstance()->getFFmpeg();
+
+            $video=$ffmpeg->open(storage_path('app'.$data['source_path']));
+
+            $video_format=$video->getFormat()->all();
+            $video_info=$video->getStreams()->videos()->first()->all();
+            $audio_info=$video->getStreams()->audios()->first()->all();
+            $format=new X264('aac','libx264');
+
+            $keyinfo_path=FF::keyInfo(dirname(dirname($data['source_path'])));
+
+            $parameter=['-f','hls','-hls_time', '10' , '-hls_list_size', '0','-hls_key_info_file',$keyinfo_path,'-hls_playlist_type','vod','-hls_allow_cache','1',];
+
+            //读取水印描述文件
+            $waterFileDiskPath=dirname(storage_path('app'.$data['source_path'])).'/water.json';
+            if (is_file($waterFileDiskPath)) {
+                $water=json_decode(file_get_contents($waterFileDiskPath),true);
+                if(!empty($water)&&isset($water['x'])&&isset($water['y'])&&isset($water['w'])&&isset($water['h'])){
+                    array_push($parameter,'-vf');
+                    array_push($parameter,"delogo=x={$water['x']}:y={$water['y']}:w={$water['w']}:h={$water['h']}");
+                }
+            }
+
+            $format
+//            ->setKiloBitrate($video_info['bit_rate']/1000*0.8)  //码率 比特率
+                ->setAudioChannels($audio_info['channels'])   // 声道设置，1单声道，2双声道，3立体声
+//            ->setAudioKiloBitrate($audio_info['bit_rate']/1000)//音频比特率
+                ->setAdditionalParameters($parameter);
+
+            $format->on('progress', function ($video, X264 $format, $percentage)use ($video_format,&$data) {
+                if($data->status!=UPLOAD_FILE_HANDLE){
+                    $data->status=UPLOAD_FILE_HANDLE;
+                    $data->save();
+                }
+            });
+            $m3u8Path=dirname(dirname($data['source_path'])).'/'.$this->uuid.'.m3u8';
+            $video->save($format,storage_path('app'.$m3u8Path));
+            $data->cover_path=dirname(dirname($data['source_path'])).'/cover.jpg';
+            $data->video_duration=FF::getInstance()->time(storage_path('app'.$data['source_path']));
+            $data->status=UPLOAD_FILE_HANDLE_SUCCESS;
+            $data->result_path=$m3u8Path;
+            $data->save();
+            Log::channel('transcoding')->info("压缩包转码==成功==:".$this->uuid);
+        }catch (\Exception $exception){
+            $msg="压缩包转码==失败==:".$exception->getMessage().' line:'.$exception->getLine();
+            $data->error_log=$msg;
+            $data->status=UPLOAD_FILE_ERROR;
+            $data->save();
+            Log::channel('transcoding')->error($msg);
+        }
+    }
+
+    public function finish()
+    {
+        Task::deliver(new UploadM3u8File($this->uuid));
+    }
+
+}
