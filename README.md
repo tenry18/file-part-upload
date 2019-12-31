@@ -6,7 +6,9 @@
      composer install
     
 2.导入数据库 file.sql
+
 3.配置MySQL,Redis
+
 4.启动服务
   
     php bin/laravels start
